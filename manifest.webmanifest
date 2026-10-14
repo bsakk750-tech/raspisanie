@@ -1,0 +1,10 @@
+{
+  "name": "Расписание уроков",
+  "short_name": "Расписание",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#edf0f7",
+  "theme_color": "#2748d8"
+}
