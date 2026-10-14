@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Расписание уроков</title>
+<meta name="theme-color" content="#edf0f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1324" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Расписание">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  html { -webkit-text-size-adjust: 100%; color-scheme: light; }
+  body { margin: 0; }
+
+  :root {
+    --bg: #edf0f7;
+    --surface: #ffffff;
+    --ink: #131b33;
+    --muted: #5b6483;
+    --line: #dde2ee;
+    --accent: #2748d8;
+    --accent-ink: #ffffff;
+    --accent-tint: #e3e9ff;
+    --font-display: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+    --font-body: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    --gl: max(16px, env(safe-area-inset-left, 0px));
+    --gr: max(16px, env(safe-area-inset-right, 0px));
+    --gap: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1324;
+      --surface: #171e36;
+      --ink: #e8ebf7;
+      --muted: #9aa3c4;
+      --line: #28314f;
+      --accent: #7c97ff;
+      --accent-ink: #0e1324;
+      --accent-tint: #222c55;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1324;
+    --surface: #171e36;
+    --ink: #e8ebf7;
+    --muted: #9aa3c4;
+    --line: #28314f;
+    --accent: #7c97ff;
+    --accent-ink: #0e1324;
+    --accent-tint: #222c55;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.4;
+    padding-left: var(--gl);
+    padding-right: var(--gr);
+    padding-block: 0 calc(32px + env(safe-area-inset-bottom, 0px));
+    min-height: 100%;
+  }
+  .wrap { max-width: 480px; margin-inline: auto; }
+
+  .bar {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 2;
+    background: var(--bg);
+    padding-block: 16px 12px;
+    display: grid;
+    gap: 12px;
+  }
+  .bar h1 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .tab {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    font: 600 15px/1 var(--font-body);
+    padding: 12px 0;
+    border-radius: 12px;
+    cursor: pointer;
+    position: relative;
+  }
+  .tab[aria-selected="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+  .tab.today::after {
+    content: "";
+    position: absolute;
+    top: 5px;
+    right: 6px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .tab[aria-selected="true"].today::after { background: var(--accent-ink); }
+  .tab:focus-visible, .step:focus-visible, .pager:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .pager {
+    display: flex;
+    gap: var(--gap);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+    align-items: flex-start;
+    margin-inline: 0;
+  }
+  .pager::-webkit-scrollbar { display: none; }
+  .day {
+    flex: 0 0 100%;
+    min-width: 0;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+  }
+  .day-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 12px;
+    padding: 8px 2px 14px;
+  }
+  .day-head h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 26px;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+  .day-head p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lessons {
+    list-style: none;
+    margin: 0;
+    padding: 4px 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .lesson {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+  .lesson + .lesson { border-top: 1px solid var(--line); }
+  .lesson .n {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .lesson .name { font-weight: 500; font-size: 17px; min-width: 0; overflow-wrap: anywhere; }
+  .lesson .time {
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+    color: var(--muted);
+    white-space: nowrap;
+    text-align: right;
+  }
+  .lesson .time b { color: var(--ink); font-weight: 600; }
+  .lesson.now { background: var(--accent-tint); }
+  .lesson.now .n { color: var(--accent); }
+  .pill {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-size: 12px;
+    font-weight: 600;
+    vertical-align: 2px;
+  }
+
+  .steps { display: flex; justify-content: space-between; gap: 12px; padding-top: 16px; }
+  .step {
+    appearance: none;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: 600 15px/1 var(--font-body);
+    padding: 10px 4px;
+    cursor: pointer;
+    border-radius: 8px;
+  }
+  .step[hidden] { display: none !important; }
+  .step.next { margin-left: auto; }
+
+  @media (max-width: 380px) {
+    .lesson { padding: 13px 12px; gap: 10px; }
+    .lesson .name { font-size: 16px; }
+    .day-head h2 { font-size: 23px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="bar">
+    <h1>Расписание уроков</h1>
+    <div class="tabs" role="tablist" id="tabs" aria-label="Дни недели"></div>
+  </div>
+  <div class="pager" id="pager" tabindex="0" aria-label="Расписание по дням, листайте влево и вправо"></div>
+  <div class="steps">
+    <button class="step prev" id="prev" type="button"></button>
+    <button class="step next" id="next" type="button"></button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var DAYS = [
+    { short: "Пн", full: "Понедельник", lessons: [
+      ["Разговор о важном", "8:00", "8:30"],
+      ["Алгебра", "8:35", "9:10"],
+      ["Русский язык", "9:15", "9:50"],
+      ["Физика", "9:55", "10:30"],
+      ["Химия", "10:35", "11:10"],
+      ["Рус. литература", "11:15", "11:50"],
+      ["Геометрия", "11:55", "12:30"]
+    ]},
+    { short: "Вт", full: "Вторник", lessons: [
+      ["География", "8:00", "8:40"],
+      ["ОБЗР", "8:45", "9:25"],
+      ["Информатика", "9:30", "10:10"],
+      ["Алгебра", "10:15", "10:55"],
+      ["Вер/стат", "11:00", "11:40"],
+      ["Биология", "11:45", "12:25"],
+      ["Труд", "12:30", "13:10"]
+    ]},
+    { short: "Ср", full: "Среда", lessons: [
+      ["Рус. литература", "8:00", "8:40"],
+      ["Русский язык", "8:45", "9:25"],
+      ["Алгебра", "9:30", "10:10"],
+      ["Геометрия", "10:15", "10:55"],
+      ["Чеченский язык", "11:00", "11:40"],
+      ["Чеченская литература", "11:45", "12:25"],
+      ["История", "12:30", "13:10"]
+    ]},
+    { short: "Чт", full: "Четверг", lessons: [
+      ["Физика", "8:00", "8:35"],
+      ["География", "8:40", "9:15"],
+      ["Обществознание", "9:20", "9:55"],
+      ["Химия", "10:00", "10:35"],
+      ["Биология", "10:40", "11:15"],
+      ["Английский язык", "11:20", "11:55"],
+      ["Россия — мои горизонты", "12:00", "12:35"]
+    ]},
+    { short: "Пт", full: "Пятница", lessons: [
+      ["Русский язык", "8:00", "8:40"],
+      ["Рус. литература", "8:45", "9:25"],
+      ["Физкультура", "9:30", "10:10"],
+      ["Физика", "10:15", "10:55"],
+      ["Чеченский язык", "11:00", "11:40"],
+      ["История", "11:45", "12:25"],
+      ["Английский язык", "12:30", "13:10"]
+    ]}
+  ];
+
+  var tabsEl = document.getElementById("tabs");
+  var pager = document.getElementById("pager");
+  var prevBtn = document.getElementById("prev");
+  var nextBtn = document.getElementById("next");
+  var GAP = 12;
+  var current = 0;
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function mins(t) { var p = t.split(":"); return +p[0] * 60 + +p[1]; }
+
+  var todayIdx = (function () {
+    var d = new Date().getDay();
+    return d >= 1 && d <= 5 ? d - 1 : -1;
+  })();
+
+  DAYS.forEach(function (day, i) {
+    var tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = "tab" + (i === todayIdx ? " today" : "");
+    tab.id = "tab" + i;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-controls", "day" + i);
+    tab.setAttribute("aria-label", day.full);
+    tab.textContent = day.short;
+    tab.addEventListener("click", function () { go(i, true); });
+    tabsEl.appendChild(tab);
+
+    var first = day.lessons[0][1];
+    var last = day.lessons[day.lessons.length - 1][2];
+    var sec = document.createElement("section");
+    sec.className = "day";
+    sec.id = "day" + i;
+    sec.setAttribute("role", "tabpanel");
+    sec.setAttribute("aria-labelledby", "tab" + i);
+
+    var head = document.createElement("div");
+    head.className = "day-head";
+    var h = document.createElement("h2");
+    h.textContent = day.full;
+    var meta = document.createElement("p");
+    meta.textContent = day.lessons.length + " уроков, " + first + "–" + last;
+    head.appendChild(h);
+    head.appendChild(meta);
+
+    var ol = document.createElement("ol");
+    ol.className = "lessons";
+    day.lessons.forEach(function (l, k) {
+      var li = document.createElement("li");
+      li.className = "lesson";
+      li.dataset.start = l[1];
+      li.dataset.end = l[2];
+      var n = document.createElement("span");
+      n.className = "n";
+      n.textContent = k + 1;
+      var name = document.createElement("span");
+      name.className = "name";
+      name.textContent = l[0];
+      var time = document.createElement("span");
+      time.className = "time";
+      var b = document.createElement("b");
+      b.textContent = l[1];
+      time.appendChild(b);
+      time.appendChild(document.createTextNode(" – " + l[2]));
+      li.appendChild(n);
+      li.appendChild(name);
+      li.appendChild(time);
+      ol.appendChild(li);
+    });
+
+    sec.appendChild(head);
+    sec.appendChild(ol);
+    pager.appendChild(sec);
+  });
+
+  function step() {
+    var first = pager.children[0];
+    return first.getBoundingClientRect().width + GAP;
+  }
+
+  function setActive(i) {
+    current = i;
+    DAYS.forEach(function (_, k) {
+      var t = document.getElementById("tab" + k);
+      t.setAttribute("aria-selected", k === i ? "true" : "false");
+      t.tabIndex = k === i ? 0 : -1;
+    });
+    if (i > 0) {
+      prevBtn.hidden = false;
+      prevBtn.textContent = "← " + DAYS[i - 1].full;
+    } else {
+      prevBtn.hidden = true;
+    }
+    if (i < DAYS.length - 1) {
+      nextBtn.hidden = false;
+      nextBtn.textContent = DAYS[i + 1].full + " →";
+    } else {
+      nextBtn.hidden = true;
+    }
+  }
+
+  var lockTarget = null;
+  var lockTimer = null;
+
+  function unlock() {
+    lockTarget = null;
+    clearTimeout(lockTimer);
+  }
+
+  function go(i, smooth) {
+    i = Math.max(0, Math.min(DAYS.length - 1, i));
+    setActive(i);
+    if (smooth && !reduce) {
+      lockTarget = i;
+      clearTimeout(lockTimer);
+      lockTimer = setTimeout(unlock, 900);
+      pager.scrollTo({ left: i * step(), behavior: "smooth" });
+    } else {
+      unlock();
+      pager.scrollTo({ left: i * step(), behavior: "auto" });
+    }
+  }
+
+  var ticking = false;
+  pager.addEventListener("scroll", function () {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function () {
+      ticking = false;
+      if (lockTarget !== null) {
+        if (Math.abs(pager.scrollLeft - lockTarget * step()) < 2) unlock();
+        return;
+      }
+      var i = Math.round(pager.scrollLeft / step());
+      i = Math.max(0, Math.min(DAYS.length - 1, i));
+      if (i !== current) setActive(i);
+    });
+  }, { passive: true });
+
+  pager.addEventListener("touchstart", unlock, { passive: true });
+  pager.addEventListener("wheel", unlock, { passive: true });
+
+  prevBtn.addEventListener("click", function () { go(current - 1, true); });
+  nextBtn.addEventListener("click", function () { go(current + 1, true); });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft") { go(current - 1, true); }
+    else if (e.key === "ArrowRight") { go(current + 1, true); }
+  });
+
+  var lastWidth = window.innerWidth;
+  window.addEventListener("resize", function () {
+    if (window.innerWidth === lastWidth) return;
+    lastWidth = window.innerWidth;
+    go(current, false);
+  });
+
+  function markNow() {
+    if (todayIdx < 0) return;
+    var d = new Date();
+    var m = d.getHours() * 60 + d.getMinutes();
+    var items = document.querySelectorAll("#day" + todayIdx + " .lesson");
+    Array.prototype.forEach.call(items, function (li) {
+      var isNow = m >= mins(li.dataset.start) && m < mins(li.dataset.end);
+      var has = li.classList.contains("now");
+      if (isNow === has) return;
+      if (isNow) {
+        li.classList.add("now");
+        var pill = document.createElement("span");
+        pill.className = "pill";
+        pill.textContent = "идёт";
+        li.querySelector(".name").appendChild(pill);
+      } else {
+        li.classList.remove("now");
+        var p = li.querySelector(".pill");
+        if (p) p.remove();
+      }
+    });
+  }
+
+  var startIdx = todayIdx >= 0 ? todayIdx : 0;
+  setActive(startIdx);
+  go(startIdx, false);
+  markNow();
+  setInterval(markNow, 30000);
+})();
+</script>
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").catch(function () {});
+  });
+}
+</script>
+</body>
+</html>
